@@ -310,7 +310,22 @@ def main():
         if bg_posy >= 0 and not paused and not flozen:
             bg_posy = -700
         if not paused and not flozen:
-            bg_posy += 0.5
+            bg_posy += 0.5# 绘制血条
+                pygame.draw.line(screen, BLACK,
+                                 (each.rect.left, each.rect.top - 5),
+                                 (each.rect.right,each.rect.top - 5),
+                                 2)
+                # 当生命大于20%显示绿色，否则显示红色
+                energy_remain = each.energy / enemy.BigEnemy.energy
+                if energy_remain > 0.2:
+                    energy_color = GREEN
+                else:
+                    energy_color = RED
+                    pygame.draw.line(screen, energy_color,
+                                     (each.rect.left, each.rect.top - 5),
+                                     (each.rect.left, each.rect.width * energy_remain,
+                                     each.rect.top - 5), 2)
+
         screen.blit(background, (0, bg_posy))
         if life_num and not paused:
             if not flozen:

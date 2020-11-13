@@ -1,11 +1,10 @@
 import pygame
 import sys
-import os
 import traceback
-from pygame.locals import *
-from random import *
 from aircraft import enemy
 from aircraft import myplane
+from aircraft import bullet
+from pygame.locals import *
 
 pygame.init()
 pygame.mixer.init()
@@ -15,6 +14,10 @@ screen = pygame.display.set_mode(bg_size)
 pygame.display.set_caption("飞机大战")
 
 background = pygame.image.load("images/background.png").convert()
+
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
 
 # 游戏音乐
 pygame.mixer.music.load("sound/game_music.ogg")
@@ -71,10 +74,7 @@ def add_big_enemies(group1, group2, num):
 
 
 def main():
-    """
 
-    :rtype: object
-    """
     pygame.mixer.music.play(-1)
 
     # 生成我方飞机
@@ -91,8 +91,14 @@ def main():
     big_enemies = pygame.sprite.Group()
     add_big_enemies(big_enemies, enemies, 2)
 
-    clock = pygame.time.Clock()
+    # 生成普通子弹
+    bullet1 = []
+    bullet1_index = 0
+    BULLET_NUM = 4
+    for i in range(BULLET_NUM):
+        bullet1.append(bullet.Bullet1(me.rect.midtop))
 
+    clock = pygame.time.Clock()
 
     e1_destroy_index = 0
     e2_destroy_index = 0
@@ -127,15 +133,33 @@ def main():
             me.moveRight()
 
         screen.blit(background, (0, 0))
+        # 发射子弹
+        if not(delay % 10):
+            bullet1[bullet1_index].reset(me.rect.midtop)
+            bullet1_index = (bullet1_index + 1) % BULLET_NUM
+
+        # 检测子弹是否击中敌机
+        for b in bullet1:
+            if b.active:
+                b.move()
+                screen.blit(b.image, b.rect)
+                enemy_hit = pygame.sprite.spritecollide(b, enemies, False, pygame.sprite.collide_mask)
+                if enemy_hit:
+                    b.active = False
+                    for e in enemy_hit:
+                        if e in mid_enemies or e in big_enemies:
+                            e.energy -= 1
+                            if e.energy ==0:
+                                e.active = False
+                        else:
+                            e.active = False
 
         # 检测我放飞机是否被撞
-        enemies_down = pygame.sprite.spritecollide(me, enemies, False)
+        enemies_down = pygame.sprite.spritecollide(me, enemies, False, pygame.sprite.collide_mask)
         if enemies_down:
-            me.active = False
+            # me.active = False
             for e in enemies_down:
                 e.active = False
-
-
 
         # 绘制大型飞机
         for each in big_enemies:
@@ -146,15 +170,33 @@ def main():
                 else:
                     screen.blit(each.image2, each.rect)
 
-                if each.rect.bottom > -50:
-                    enemy3_fly_sound.play()
+                # 绘制血条
+                pygame.draw.line(screen, BLACK,
+                                 (each.rect.left, each.rect.top - 5),
+                                 (each.rect.right,each.rect.top - 5),
+                                 2)
+                # 当生命大于20%显示绿色，否则显示红色
+                energy_remain = each.energy / enemy.BigEnemy.energy
+                if energy_remain > 0.2:
+                    energy_color = GREEN
+                else:
+                    energy_color = RED
+                    pygame.draw.line(screen, energy_color,
+                                     (each.rect.left, each.rect.top - 5),
+                                     (each.rect.left, each.rect.width * energy_remain,
+                                     each.rect.top - 5), 2)
+
+                if each.rect.bottom == -50:
+                    enemy3_fly_sound.play(-1)
             else:
                 # 毁灭
-                enemy3_down_sound.play()
                 if not(delay % 3):
+                    if e3_destroy_index == 0:
+                        enemy3_down_sound.play()
                     screen.blit(each.destroy_images[e3_destroy_index],each.rect)
                     e3_destroy_index = (e3_destroy_index + 1) % 6
                     if e3_destroy_index == 0:
+                        enemy3_fly_sound.stop()
                         each.reset()
 
 
@@ -163,10 +205,28 @@ def main():
             if each.active:
                 each.move()
                 screen.blit(each.image, each.rect)
+
+                # 绘制血条
+                pygame.draw.line(screen, BLACK,
+                                 (each.rect.left, each.rect.top - 5),
+                                 (each.rect.right,each.rect.top - 5),
+                                 2)
+                # 当生命大于20%显示绿色，否则显示红色
+                energy_remain = each.energy / enemy.MidEnemy.energy
+                if energy_remain > 0.2:
+                    energy_color = GREEN
+                else:
+                    energy_color = RED
+                pygame.draw.line(screen, energy_color,
+                                 (each.rect.left, each.rect.top - 5),
+                                 (each.rect.left + each.rect.width * energy_remain,
+                                 each.rect.top - 5), 2)
+
             else:
                 # 毁灭
-                enemy2_down_sound.play()
                 if not (delay % 3):
+                    if e2_destroy_index == 0:
+                        enemy2_down_sound.play()
                     screen.blit(each.destroy_images[e2_destroy_index], each.rect)
                     e2_destroy_index = (e2_destroy_index + 1) % 4
                     if e2_destroy_index == 0:
@@ -178,6 +238,8 @@ def main():
             if each.active:
                 each.move()
                 screen.blit(each.image, each.rect)
+
+
             else:
                 # 毁灭
                 enemy1_down_sound.play()
@@ -187,6 +249,7 @@ def main():
                     if e1_destroy_index == 0:
                         each.reset()
 
+
         # 绘制我方飞机
         if me.active:
             if switch_image:
@@ -195,12 +258,14 @@ def main():
                 screen.blit(me.image2, me.rect)
         else:
             # 毁灭
-            me_down_sound.play()
             if not (delay % 3):
+                if me_destroy_index == 0:
+                    me_down_sound.play()
                 screen.blit(me.destroy_images[me_destroy_index], me.rect)
                 me_destroy_index = (me_destroy_index + 1) % 4
                 if me_destroy_index == 0:
-                    each.reset()
+                    print("Game Over!")
+                    running = False
 
 
         if not (delay % 5):
